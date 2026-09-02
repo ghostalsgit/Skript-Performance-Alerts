@@ -1,0 +1,369 @@
+# Performance Alerts
+# Minecraft: 1.20+
+# Server: Paper / Purpur
+# Skript: 2.7+
+# Author: Ghostals
+
+options:
+    # Basic configuration
+    plugin-name: &b&lPerformance Alerts
+    prefix: &7&l[&b&lPA&7&l] &r
+    version: 1.110.3
+    author: Ghostals
+
+    # TPS limits
+    tps-warning: 18
+    tps-critical: 15
+
+    # Memory limits
+    ram-warning: 80
+    ram-critical: 90
+
+    # How often the server is checked
+    check-interval: 10 seconds
+    alert-cooldown: 5 minutes
+
+    permission: performancealerts.admin
+
+
+# Reset the monitor when the script loads
+on load:
+    set {perf::tps-state} to "normal"
+    set {perf::ram-state} to "normal"
+
+    delete {perf::last-alert}
+    delete {perf::combined-alert}
+
+    send "" to console
+    send "&8&m===============================================" to console
+    send "               {@plugin-name}                  " to console
+    send "           &7Version v{@version} by {@author}  " to console
+    send "" to console
+    send "    &a[✔] &7Performance Monitoring Enabled       " to console
+    send "    &a[✔] &7TPS Check Interval: &f{@check-interval}" to console
+    send "    &a[✔] &7RAM Alert Threshold: &f{@ram-warning}%% " to console
+    send "&8&m===============================================" to console
+    send "" to console
+
+
+# Check TPS and memory periodically
+every {@check-interval}:
+
+    # TPS averages
+    set {_tps-1} to tps from last 1 minute
+    set {_tps-5} to tps from last 5 minutes
+    set {_tps-15} to tps from last 15 minutes
+
+    # Memory usage
+    set {_max} to max memory
+    set {_total} to total memory
+    set {_free} to free memory
+
+    set {_used} to {_total} - {_free}
+
+    if {_max} > 0:
+        set {_ram-percent} to ({_used} / {_max}) * 100
+    else:
+        set {_ram-percent} to 0
+
+
+    # TPS check
+    if {_tps-1} < {@tps-critical}:
+        if {perf::tps-state} is not "critical":
+            set {perf::tps-state} to "critical"
+
+            if {perf::last-alert} is not set:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&4&l⚠ CRITICAL TPS WARNING"
+                broadcast ""
+                broadcast "&c1m TPS: &f%round({_tps-1}, 1)% &8| &c5m: &f%round({_tps-5}, 1)% &8| &c15m: &f%round({_tps-15}, 1)%"
+                broadcast "&7The server is experiencing severe tick lag."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+            else if difference between now and {perf::last-alert} >= {@alert-cooldown}:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&4&l⚠ CRITICAL TPS WARNING"
+                broadcast ""
+                broadcast "&c1m TPS: &f%round({_tps-1}, 1)% &8| &c5m: &f%round({_tps-5}, 1)% &8| &c15m: &f%round({_tps-15}, 1)%"
+                broadcast "&7The server is experiencing severe tick lag."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+    else if {_tps-1} < {@tps-warning}:
+        if {perf::tps-state} is not "warning":
+            set {perf::tps-state} to "warning"
+
+            if {perf::last-alert} is not set:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&6&l⚠ SERVER PERFORMANCE"
+                broadcast ""
+                broadcast "&e1m TPS: &f%round({_tps-1}, 1)% &8| &e5m: &f%round({_tps-5}, 1)% &8| &e15m: &f%round({_tps-15}, 1)%"
+                broadcast "&7The server may be starting to slow down."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+            else if difference between now and {perf::last-alert} >= {@alert-cooldown}:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&6&l⚠ SERVER PERFORMANCE"
+                broadcast ""
+                broadcast "&e1m TPS: &f%round({_tps-1}, 1)% &8| &e5m: &f%round({_tps-5}, 1)% &8| &e15m: &f%round({_tps-15}, 1)%"
+                broadcast "&7The server may be starting to slow down."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+    else:
+        if {perf::tps-state} is not "normal":
+            broadcast "{@prefix}&aTPS recovered (1m: &f%round({_tps-1}, 1)%&a)."
+            set {perf::tps-state} to "normal"
+
+
+    # Memory check
+    if {_ram-percent} >= {@ram-critical}:
+        if {perf::ram-state} is not "critical":
+            set {perf::ram-state} to "critical"
+
+            if {perf::last-alert} is not set:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&4&l⚠ CRITICAL MEMORY WARNING"
+                broadcast ""
+                broadcast "&cRAM usage is at &f%round({_ram-percent}, 1)% percent&c."
+                broadcast "&7Used: &f%round({_used}, 0)% MB &8| &7Max: &f%round({_max}, 0)% MB"
+                broadcast "&7The JVM is approaching its maximum heap."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+            else if difference between now and {perf::last-alert} >= {@alert-cooldown}:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&4&l⚠ CRITICAL MEMORY WARNING"
+                broadcast ""
+                broadcast "&cRAM usage is at &f%round({_ram-percent}, 1)% percent&c."
+                broadcast "&7Used: &f%round({_used}, 0)% MB &8| &7Max: &f%round({_max}, 0)% MB"
+                broadcast "&7The JVM is approaching its maximum heap."
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+    else if {_ram-percent} >= {@ram-warning}:
+        if {perf::ram-state} is not "warning":
+            set {perf::ram-state} to "warning"
+
+            if {perf::last-alert} is not set:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&6&l⚠ HIGH MEMORY USAGE"
+                broadcast ""
+                broadcast "&eRAM usage is at &f%round({_ram-percent}, 1)% percent&e."
+                broadcast "&7Used: &f%round({_used}, 0)% MB &8| &7Max: &f%round({_max}, 0)% MB"
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+            else if difference between now and {perf::last-alert} >= {@alert-cooldown}:
+                set {perf::last-alert} to now
+
+                broadcast ""
+                broadcast "&8&m----------------------------------------"
+                broadcast "{@prefix}&6&l⚠ HIGH MEMORY USAGE"
+                broadcast ""
+                broadcast "&eRAM usage is at &f%round({_ram-percent}, 1)% percent&e."
+                broadcast "&7Used: &f%round({_used}, 0)% MB &8| &7Max: &f%round({_max}, 0)% MB"
+                broadcast "&8&m----------------------------------------"
+                broadcast ""
+
+    else:
+        if {perf::ram-state} is not "normal":
+            broadcast "{@prefix}&aRAM usage recovered to &f%round({_ram-percent}, 1)% percent&a."
+            set {perf::ram-state} to "normal"
+
+
+    # Check if both TPS and memory are at critical levels
+    if {_tps-1} < {@tps-critical}:
+        if {_ram-percent} >= {@ram-critical}:
+
+            if {perf::combined-alert} is not set:
+                set {perf::combined-alert} to now
+
+                broadcast ""
+                broadcast "&8&m========================================"
+                broadcast "{@prefix}&4&l⚠ CRITICAL SERVER BOTTLENECK"
+                broadcast ""
+                broadcast "&c1m TPS: &f%round({_tps-1}, 1)% &8| &cRAM: &f%round({_ram-percent}, 1)% percent"
+                broadcast ""
+                broadcast "&7The server is experiencing:"
+                broadcast "&c• Severe TPS degradation"
+                broadcast "&c• Very high memory usage"
+                broadcast ""
+                broadcast "&7Investigate entities, chunks, plugins,"
+                broadcast "&7GC activity and recent player activity."
+                broadcast "&8&m========================================"
+                broadcast ""
+
+            else if difference between now and {perf::combined-alert} >= {@alert-cooldown}:
+                set {perf::combined-alert} to now
+
+                broadcast ""
+                broadcast "&8&m========================================"
+                broadcast "{@prefix}&4&l⚠ CRITICAL SERVER BOTTLENECK"
+                broadcast ""
+                broadcast "&c1m TPS: &f%round({_tps-1}, 1)% &8| &cRAM: &f%round({_ram-percent}, 1)% percent"
+                broadcast ""
+                broadcast "&7The server is experiencing:"
+                broadcast "&c• Severe TPS degradation"
+                broadcast "&c• Very high memory usage"
+                broadcast "&8&m========================================"
+                broadcast ""
+
+        else:
+            delete {perf::combined-alert}
+
+    else:
+        delete {perf::combined-alert}
+
+
+# Commands
+command /performancealerts [<text>]:
+    aliases: /pa, /perfalerts
+    permission: {@permission}
+    permission message: {@prefix}&cYou do not have permission to use this command.
+    trigger:
+
+        # Help
+        if arg-1 is "help":
+            send ""
+            send "&8&m========================================"
+            send "      {@plugin-name} &8- &7v{@version}"
+            send ""
+            send "&b/pa &8- &7View current server performance."
+            send "&b/pa alert &8- &7Broadcast a forced performance report."
+            send "&b/pa reload &8- &7Reload the script configuration."
+            send "&b/pa help &8- &7View this help menu."
+            send ""
+            send "       &7&oPerformance Alerts by Ghostals"
+            send "&8&m========================================"
+            send ""
+            stop
+
+
+        # Reload
+        if arg-1 is "reload":
+            execute console command "sk reload perfAlerts"
+            send "{@prefix}&aConfiguration and scripts reloaded successfully."
+            stop
+
+
+        # Manually broadcast a performance report
+        if arg-1 is "alert":
+            set {_tps-1} to tps from last 1 minute
+            set {_tps-5} to tps from last 5 minutes
+            set {_tps-15} to tps from last 15 minutes
+
+            set {_max} to max memory
+            set {_total} to total memory
+            set {_free} to free memory
+            set {_used} to {_total} - {_free}
+
+            if {_max} > 0:
+                set {_ram-percent} to ({_used} / {_max}) * 100
+            else:
+                set {_ram-percent} to 0
+
+            broadcast ""
+            broadcast "&8&m========================================"
+            broadcast "{@prefix}&b&lFORCED PERFORMANCE REPORT"
+            broadcast ""
+            broadcast "&71m TPS: &f%round({_tps-1}, 1)%"
+            broadcast "&75m TPS: &f%round({_tps-5}, 1)%"
+            broadcast "&715m TPS: &f%round({_tps-15}, 1)%"
+            broadcast "&7RAM usage: &f%round({_ram-percent}, 1)% percent"
+            broadcast "&7RAM used: &f%round({_used}, 0)% MB"
+            broadcast "&7RAM maximum: &f%round({_max}, 0)% MB"
+            broadcast "&8&m========================================"
+            broadcast ""
+            stop
+
+
+        # /pa and /pa status
+        set {_showStatus} to false
+
+        if arg-1 is not set:
+            set {_showStatus} to true
+        else if arg-1 is "status":
+            set {_showStatus} to true
+
+        if {_showStatus} is true:
+            set {_tps-1} to tps from last 1 minute
+            set {_tps-5} to tps from last 5 minutes
+            set {_tps-15} to tps from last 15 minutes
+
+            set {_max} to max memory
+            set {_total} to total memory
+            set {_free} to free memory
+            set {_used} to {_total} - {_free}
+
+            if {_max} > 0:
+                set {_ram-percent} to ({_used} / {_max}) * 100
+            else:
+                set {_ram-percent} to 0
+
+            send ""
+            send "&8&m----------------------------------------"
+            send "{@prefix}&b&lSERVER STATUS"
+            send ""
+            send "&7TPS (1m): &f%round({_tps-1}, 1)%"
+            send "&7TPS (5m): &f%round({_tps-5}, 1)%"
+            send "&7TPS (15m): &f%round({_tps-15}, 1)%"
+
+            if {_tps-1} >= {@tps-warning}:
+                send "&7TPS Status: &aHealthy"
+            else if {_tps-1} >= {@tps-critical}:
+                send "&7TPS Status: &eDegraded"
+            else:
+                send "&7TPS Status: &cCritical"
+
+            send ""
+            send "&7RAM Used: &f%round({_used}, 0)% MB"
+            send "&7RAM Allocated: &f%round({_total}, 0)% MB"
+            send "&7RAM Maximum: &f%round({_max}, 0)% MB"
+            send "&7RAM Usage: &f%round({_ram-percent}, 1)% percent"
+
+            if {_ram-percent} < {@ram-warning}:
+                send "&7RAM Status: &aHealthy"
+            else if {_ram-percent} < {@ram-critical}:
+                send "&7RAM Status: &eHigh"
+            else:
+                send "&7RAM Status: &cCritical"
+
+            send ""
+            send "&8&oType &7&o/pa help &8&ofor more commands."
+            send "&8&m----------------------------------------"
+            send ""
+            stop
+
+
+        # Unknown command argument
+        if {_showStatus} is false:
+            send "{@prefix}&cUnknown argument. Type &7/pa help &cfor commands."
+
+
+# Tab completion
+on tab complete for "/performancealerts" or "/pa" or "/perfalerts":
+    set tab completions for position 1 to "status", "help", "reload", and "alert"
